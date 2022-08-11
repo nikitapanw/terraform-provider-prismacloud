@@ -297,6 +297,39 @@ func resourcePolicy() *schema.Resource {
 								false,
 							),
 						},
+						"children": {
+							Type:        schema.TypeList,
+							Optional:    true,
+							Description: "",
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"criteria": {
+										Type:        schema.TypeString,
+										Required:    true,
+										Description: "",
+									},
+									"type": {
+										Type:        schema.TypeString,
+										Required:    true,
+										Description: "",
+										ValidateFunc: validation.StringInSlice(
+											[]string{
+												"tf",
+												"cft",
+												"k8s",
+												"build",
+											},
+											false,
+										),
+									},
+									"recommendation": {
+										Type:        schema.TypeString,
+										Required:    true,
+										Description: "",
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -434,6 +467,17 @@ func parsePolicy(d *schema.ResourceData, id string) policy.Policy {
 		}
 	}
 
+	cld := rspec["children"].([]interface{})
+	ans.Rule.Children = make([]policy.Children, 0, len(cld))
+	for _, chi := range cld {
+		cl := chi.(map[string]interface{})
+		ans.Rule.Children = append(ans.Rule.Children, policy.Children{
+			Criteria:       cl["criteria"].(string),
+			Type:           cl["type"].(string),
+			Recommendation: cl["recommendation"].(string),
+		})
+	}
+
 	rem := d.Get("remediation").([]interface{})
 	if len(rem) > 0 {
 		if rems := rem[0].(map[string]interface{}); len(rems) > 0 {
@@ -535,6 +579,16 @@ func savePolicy(d *schema.ResourceData, obj policy.Policy) {
 		}
 		rv["data_criteria"] = []interface{}{data}
 	}
+
+	children := make([]interface{}, 0, len(obj.Rule.Children))
+	for _, chi := range obj.Rule.Children {
+		children = append(children, map[string]interface{}{
+			"criteria":       chi.Criteria,
+			"type":           chi.Type,
+			"recommendation": chi.Recommendation,
+		})
+	}
+	rv["children"] = children
 
 	pm := make(map[string]interface{})
 	for k, v := range obj.Rule.Parameters {
